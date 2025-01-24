@@ -1,87 +1,271 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 
-type Roadmap = {
-  phases: Array<{
-    name: string;
-    timeline: string;
-    tasks: string[];
-  }>;
+type RoadmapPhase = {
+  name: string;
+  timeline: string;
+  tasks: string[];
+  milestones: string[];
 };
+
+type Roadmap = {
+  phases: RoadmapPhase[];
+};
+
+type DeepSeekError = {
+  code: number;
+  message: string;
+  type?: string;
+  param?: string;
+};
+
+const DEEPSEEK_ERROR_MAP: { [key: number]: string } = {
+  400: 'Invalid request parameters - check your input format',
+  401: 'Authentication failed - check your API key',
+  402: 'Payment required - insufficient balance',
+  403: 'Forbidden - check model permissions',
+  404: 'Model not found',
+  429: 'Rate limit exceeded - slow down requests',
+  500: 'Internal server error - try again later',
+  503: 'Service unavailable - check system status',
+};
+
+const JSON_RETRY_PROMPT = `Fix this JSON syntax error and return only valid JSON:`;
 
 export async function POST(request: Request) {
   try {
     const { appName, purpose, features } = await request.json();
 
-    // Optimized prompt for DeepSeek
-    const prompt = `
-    Act as a senior product manager and generate a comprehensive MVP roadmap for a ${appName} app. 
-    Purpose: ${purpose}. 
-    Features: ${features.join(", ")}. 
-    
-    Your response must be in JSON format with the following structure:
-    {
-      "phases": [
-        {
-          "name": "Phase name",
-          "timeline": "Estimated duration",
-          "tasks": [
-            "Task 1 ",
-            "Task 2 "
-          ],
-          "milestones": [
-            "Milestone 1 ",
-            "Milestone 2 "
-          ]
-        }
-      ]
+    // Enhanced input validation
+    if (!appName?.trim()) {
+      return NextResponse.json(
+        { error: 'App name is required (e.g., "Coffee Tracker Pro")' },
+        { status: 400 }
+      );
     }
+
+    if (!purpose?.trim() || purpose.length < 20) {
+      return NextResponse.json(
+        { 
+          error: 'Purpose must be at least 20 characters',
+          example: "Create a fitness app that tracks workouts and provides personalized recommendations"
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!Array.isArray(features) || features.length < 3 || features.some(f => typeof f !== 'string')) {
+      return NextResponse.json(
+        { 
+          error: 'Please provide 3-5 core features as strings',
+          example: ["Workout Tracking", "Meal Planner", "Progress Analytics"]
+        },
+        { status: 400 }
+      );
+    }
+
+    // Optimized system prompt
+    const systemMessage = {
+      role: 'system',
+      content: `You are a JSON API endpoint. Respond ONLY with:
+      {
+        "phases": [
+          {
+            "name": "Phase Name",
+            "timeline": "Duration (e.g., "2 weeks")",
+            "tasks": ["Day 1: Action", "Day 2: Action"],
+            "milestones": ["Complete X", "Launch Y"]
+          }
+        ]
+      }
+      RULES:
+      1. Timeline format: <number>[optional -<number>] weeks
+      2. Milestones start with verbs
+      3. No markdown/comments
+      4. Escape special characters
+      5. Validate JSON syntax`
+    };
+
+    const userPrompt = `Generate MVP roadmap for ${appName}
+    Purpose: ${purpose}
+    Features: ${features.join(', ')}
     
-    Key Requirements:
-    - Use clear and simple language suitable for all audiences, avoiding jargon or technical terms.
-    - Break down tasks into small, actionable steps that are easy to execute.
-    - Include measurable and specific milestones for each phase to track progress.
-    - Be creative and professional, ensuring the roadmap balances strategic vision with practicality.
-    - The roadmap should prioritize delivering a functional MVP with the smallest viable set of features.
-    - Ensure the plan is realistic and actionable for a cross-functional team.
-    
-    Remember, the goal is to create a roadmap that sets clear expectations, minimizes risks, and facilitates iterative development while focusing on delivering value to users.
-    `;
-    
+    Required:
+    - Phases with clear timelines
+    - Daily actionable tasks
+    - Measurable milestones`;
 
     const response = await axios.post(
-      'https://api.deepseek.com/v1/chat/completions', // DeepSeek endpoint
+      'https://api.deepseek.com/v1/chat/completions',
       {
-        model: 'deepseek-chat', // Confirm correct model name
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
+        model: 'deepseek-reasoner',
+        messages: [systemMessage, { role: 'user', content: userPrompt }],
+        temperature: 0.3,
+        max_tokens: 4096,
+        top_p: 0.9
       },
       {
         headers: {
           'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
           'Content-Type': 'application/json',
         },
+        timeout: 20000
       }
     );
 
-    // Validate response
-    const rawData = response.data.choices[0].message.content;
-    const parsedData: Roadmap = JSON.parse(rawData);
-
-    if (!parsedData.phases || !Array.isArray(parsedData.phases)) {
-      throw new Error("Invalid roadmap format from DeepSeek");
-    }
+    // Process response
+    let rawData = response.data.choices[0].message.content;
+    rawData = sanitizeJsonResponse(rawData);
+    
+    const parsedData = await parseWithRetry(rawData);
+    validateRoadmapStructure(parsedData);
 
     return NextResponse.json(parsedData);
 
   } catch (error) {
-    console.error("DeepSeek API Error:", {
-      error: error.message,
-      response: error.response?.data,
-    });
+    console.error("Roadmap Generation Error:", error.message);
+    return handleErrorResponse(error);
+  }
+}
+
+// Helper functions
+function sanitizeJsonResponse(rawData: string): string {
+  return rawData
+    .replace(/```json|```/g, '')
+    .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3') // Quote keys
+    .replace(/'/g, '"') // Convert single quotes
+    .replace(/(\d+)\s*-\s*(\d+)/g, '$1-$2') // Normalize ranges
+    .replace(/,\s*([}\]])/g, '$1') // Remove trailing commas
+    .trim();
+}
+
+async function parseWithRetry(rawData: string): Promise<Roadmap> {
+  try {
+    return JSON.parse(rawData);
+  } catch (parseError) {
+    console.warn('JSON Parse Error - Attempting correction...');
+    
+    try {
+      const correctionResponse = await axios.post(
+        'https://api.deepseek.com/v1/chat/completions',
+        {
+          model: 'deepseek-reasoner',
+          messages: [
+            { role: 'user', content: `${JSON_RETRY_PROMPT}\n${rawData}` }
+          ],
+          temperature: 0.1,
+          max_tokens: 2000
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 15000
+        }
+      );
+
+      const correctedData = sanitizeJsonResponse(
+        correctionResponse.data.choices[0].message.content
+      );
+      
+      return JSON.parse(correctedData);
+    } catch (retryError) {
+      throw new Error(`Failed to parse JSON after retry: ${retryError.message}`);
+    }
+  }
+}
+
+function validateRoadmapStructure(data: Roadmap): void {
+  if (!data?.phases?.length) {
+    throw new Error('No phases generated in roadmap');
+  }
+
+  data.phases.forEach((phase, index) => {
+    if (!/^\d+(-\d+)?\s+weeks?$/i.test(phase.timeline)) {
+      throw new Error(
+        `Invalid timeline in "${phase.name}": "${phase.timeline}". ` +
+        `Expected format like "2 weeks" or "3-4 weeks".`
+      );
+    }
+
+    if (!phase.tasks?.length || phase.tasks.length < 3) {
+      throw new Error(`Phase "${phase.name}" requires at least 3 tasks`);
+    }
+
+    if (!phase.milestones?.length || phase.milestones.length < 2) {
+      throw new Error(`Phase "${phase.name}" requires at least 2 milestones`);
+    }
+
+    if (!phase.milestones.every(m => /^[A-Z]/.test(m))) {
+      throw new Error(`Milestones in "${phase.name}" must start with verbs`);
+    }
+  });
+}
+
+function handleErrorResponse(error: any): NextResponse {
+  // Handle custom validation errors
+  if (error.message.includes('Invalid timeline')) {
     return NextResponse.json(
-      { error: 'Failed to generate roadmap. Contact support if billing is active.' },
-      { status: 500 }
+      {
+        error: error.message,
+        examples: ["2 weeks", "3-4 weeks", "1 week"],
+        fixTip: "Use numbers followed by 'week(s)' without dates"
+      },
+      { status: 422 }
     );
   }
+
+  if (error instanceof SyntaxError) {
+    return NextResponse.json(
+      {
+        error: 'Invalid JSON format from API',
+        commonIssues: [
+          'Special characters in feature names',
+          'Missing quotes around keys'
+        ],
+        solutions: [
+          'Wrap special terms in quotes',
+          'Simplify complex descriptions'
+        ]
+      },
+      { status: 422 }
+    );
+  }
+
+  if (axios.isAxiosError(error)) {
+    const statusCode = error.response?.status || 500;
+    const errorData: DeepSeekError = error.response?.data?.error || {
+      code: statusCode,
+      message: error.message,
+    };
+
+    return NextResponse.json(
+      {
+        error: DEEPSEEK_ERROR_MAP[statusCode] || errorData.message,
+        code: errorData.code,
+        type: errorData.type,
+        documentation: `https://api-docs.deepseek.com/errors/${errorData.code}`
+      },
+      { status: statusCode }
+    );
+  }
+
+  // Handle custom validation errors
+  if (error.message.includes('requires at least')) {
+    return NextResponse.json(
+      { error: error.message },
+      { status: 422 }
+    );
+  }
+
+  // Fallback error
+  return NextResponse.json(
+    { 
+      error: 'Failed to generate roadmap',
+      supportContact: 'support@mantis.com',
+      incidentCode: Date.now()
+    },
+    { status: 500 }
+  );
 }
