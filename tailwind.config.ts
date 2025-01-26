@@ -1,9 +1,10 @@
+// tailwind.config.js
 import type { Config } from "tailwindcss";
 
 export default {
   content: [
     "./src/**/*.{js,ts,jsx,tsx,mdx}", // Files under `src/`
-    "./public/**/*.html",            // Static HTML files
+    "./public/**/*.html",             // Static HTML files
   ],
   theme: {
     extend: {
@@ -52,6 +53,51 @@ export default {
       pattern: /^bg-(red|blue|green|yellow)-(100|200|500)$/,
       variants: ["hover", "focus"], // Add relevant variants if needed
     },
+    // Safelist classes for the floating chat widget
+    "fixed",
+    "bottom-4",
+    "right-4",
+    "z-50",
+    "transition-all",
+    "duration-300",
+    "w-96",
+    "h-[500px]",
+    "w-20",
+    "h-20",
+    "bg-white",
+    "rounded-lg",
+    "shadow-lg",
+    "flex",
+    "flex-col",
+    "overflow-hidden",
+    "border",
+    "border-gray-200",
+    "bg-blue-600",
+    "text-white",
+    "p-4",
+    "justify-between",
+    "items-center",
+    "cursor-pointer",
+    "text-lg",
+    "font-semibold",
+    "flex-1",
+    "overflow-y-auto",
+    "p-3",
+    "rounded-lg",
+    "mb-2",
+    "bg-blue-100",
+    "bg-green-100",
+    "text-gray-800",
+    "border-t",
+    "space-x-2",
+    "flex-grow",
+    "p-2",
+    "border-gray-300",
+    "hover:bg-blue-700",
   ],
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/forms'),      // For form styling
+    require('@tailwindcss/typography'), // For typography utilities
+    require('@tailwindcss/aspect-ratio'), // For aspect ratio utilities
+  ],
 } satisfies Config;

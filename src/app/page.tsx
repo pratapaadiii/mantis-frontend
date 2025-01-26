@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import Footer from "../components/Footer";
+import ChatInterface from "../components/ChatInterface";
 
 // Types
 type Phase = {
@@ -295,6 +296,7 @@ function RoadmapForm({
 }
 
 // Main Page Component
+// mantis-frontend/src/app/page.tsx
 export default function Home() {
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -361,6 +363,9 @@ export default function Home() {
         {isLoading && <LoadingOverlay />}
       </main>
       <Footer />
+
+      {/* Floating Chat Widget */}
+      {roadmap && <ChatInterface roadmap={roadmap} />}
     </div>
   );
 }
