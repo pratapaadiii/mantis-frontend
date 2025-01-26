@@ -12,6 +12,17 @@ type Roadmap = {
   phases: RoadmapPhase[];
 };
 
+type RoadmapRequest = {
+  appName: string;
+  purpose: string;
+  features: string[];
+  preferences?: {
+    timeline?: 'aggressive' | 'moderate' | 'conservative';
+    complexity?: 'basic' | 'standard' | 'advanced';
+    teamSize?: number;
+  };
+};
+
 type DeepSeekError = {
   code: number;
   message: string;
@@ -34,12 +45,18 @@ const JSON_RETRY_PROMPT = `Fix this JSON syntax error and return only valid JSON
 
 export async function POST(request: Request) {
   try {
-    const { appName, purpose, features } = await request.json();
+    const { appName, purpose, features, preferences = {} }: RoadmapRequest = await request.json();
 
-    // Enhanced input validation
-    if (!appName?.trim()) {
+    // Enhanced input validation with more specific feedback
+    if (!appName?.trim() || appName.length < 3) {
       return NextResponse.json(
-        { error: 'App name is required (e.g., "Coffee Tracker Pro")' },
+        { 
+          error: 'Invalid app name',
+          requirements: {
+            minLength: 3,
+            example: "Coffee Tracker Pro"
+          }
+        },
         { status: 400 }
       );
     }
@@ -48,7 +65,8 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { 
           error: 'Purpose must be at least 20 characters',
-          example: "Create a fitness app that tracks workouts and provides personalized recommendations"
+          example: "Create a fitness app that tracks workouts and provides personalized recommendations",
+          currentLength: purpose?.length || 0
         },
         { status: 400 }
       );
@@ -58,7 +76,12 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { 
           error: 'Please provide 3-5 core features as strings',
-          example: ["Workout Tracking", "Meal Planner", "Progress Analytics"]
+          example: ["Workout Tracking", "Meal Planner", "Progress Analytics"],
+          requirements: {
+            minFeatures: 3,
+            maxFeatures: 5,
+            type: 'string array'
+          }
         },
         { status: 400 }
       );
@@ -83,17 +106,22 @@ export async function POST(request: Request) {
       2. Milestones start with verbs
       3. No markdown/comments
       4. Escape special characters
-      5. Validate JSON syntax`
+      5. Validate JSON syntax
+      6. Adjust complexity based on team size and preferences`
     };
 
     const userPrompt = `Generate MVP roadmap for ${appName}
     Purpose: ${purpose}
     Features: ${features.join(', ')}
+    Timeline Preference: ${preferences.timeline || 'moderate'}
+    Project Complexity: ${preferences.complexity || 'standard'}
+    Team Size: ${preferences.teamSize || 'not specified'}
     
     Required:
     - Phases with clear timelines
     - Daily actionable tasks
-    - Measurable milestones`;
+    - Measurable milestones
+    - Complexity-appropriate tasks`;
 
     const response = await axios.post(
       'https://api.deepseek.com/v1/chat/completions',
@@ -109,7 +137,7 @@ export async function POST(request: Request) {
           'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        timeout: 20000
+        timeout: 50000
       }
     );
 
@@ -128,14 +156,13 @@ export async function POST(request: Request) {
   }
 }
 
-// Helper functions
 function sanitizeJsonResponse(rawData: string): string {
   return rawData
     .replace(/```json|```/g, '')
-    .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3') // Quote keys
-    .replace(/'/g, '"') // Convert single quotes
-    .replace(/(\d+)\s*-\s*(\d+)/g, '$1-$2') // Normalize ranges
-    .replace(/,\s*([}\]])/g, '$1') // Remove trailing commas
+    .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3')
+    .replace(/'/g, '"')
+    .replace(/(\d+)\s*-\s*(\d+)/g, '$1-$2')
+    .replace(/,\s*([}\]])/g, '$1')
     .trim();
 }
 
@@ -181,6 +208,8 @@ function validateRoadmapStructure(data: Roadmap): void {
     throw new Error('No phases generated in roadmap');
   }
 
+  let totalWeeks = 0;
+  
   data.phases.forEach((phase, index) => {
     if (!/^\d+(-\d+)?\s+weeks?$/i.test(phase.timeline)) {
       throw new Error(
@@ -188,6 +217,9 @@ function validateRoadmapStructure(data: Roadmap): void {
         `Expected format like "2 weeks" or "3-4 weeks".`
       );
     }
+
+    const [min, max] = phase.timeline.match(/\d+/g)!.map(Number);
+    totalWeeks += max || min;
 
     if (!phase.tasks?.length || phase.tasks.length < 3) {
       throw new Error(`Phase "${phase.name}" requires at least 3 tasks`);
@@ -201,16 +233,31 @@ function validateRoadmapStructure(data: Roadmap): void {
       throw new Error(`Milestones in "${phase.name}" must start with verbs`);
     }
   });
+
+  if (totalWeeks > 52) {
+    throw new Error('Total roadmap duration exceeds 1 year - please reduce scope');
+  }
 }
 
 function handleErrorResponse(error: any): NextResponse {
-  // Handle custom validation errors
+  // Handle timeline validation errors
   if (error.message.includes('Invalid timeline')) {
     return NextResponse.json(
       {
         error: error.message,
         examples: ["2 weeks", "3-4 weeks", "1 week"],
         fixTip: "Use numbers followed by 'week(s)' without dates"
+      },
+      { status: 422 }
+    );
+  }
+
+  if (error.message.includes('exceeds 1 year')) {
+    return NextResponse.json(
+      {
+        error: error.message,
+        suggestion: 'Consider breaking the project into smaller releases',
+        maxDuration: '52 weeks'
       },
       { status: 422 }
     );

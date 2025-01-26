@@ -10,7 +10,7 @@ export default function Footer() {
             <a href="#" className="text-gray-400 hover:text-white">LinkedIn</a>
           </div>
         </div>
-        <p className="text-gray-500">© 2024 MANTIS. All rights reserved.</p>
+        <p className="text-gray-500">© 2025 MANTIS. All rights reserved.</p>
       </div>
     </footer>
   );
