@@ -54,6 +54,10 @@ export default {
       },
       borderRadius: {
         "4xl": "2rem",
+        code: "0.5rem", // New addition
+      },
+      boxShadow: {
+        code: "0 0 0 1px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.1)", // New addition
       },
       keyframes: {
         blink: {
@@ -107,6 +111,7 @@ export default {
     "flex-1",
     "overflow-y-auto",
     "p-3",
+    "pb-8",
     "rounded-lg",
     "mb-2",
     "bg-blue-100",
@@ -135,6 +140,9 @@ export default {
     "shadow-md",
     "prose",
     "prose-sm",
+    "p-4", // New addition
+    "rounded-code", // New addition
+    "shadow-code", // New addition
   ],
   plugins: [
     require("@tailwindcss/forms"),
