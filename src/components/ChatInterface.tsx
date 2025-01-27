@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
 import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import { atomOneLight } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 
@@ -39,7 +40,10 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
       }
 
       const data = await response.json();
-      setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: data.message },
+      ]);
     } catch (error) {
       alert(error.message);
     } finally {
@@ -67,7 +71,7 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
         </SyntaxHighlighter>
       );
     }
-    return <p className="text-gray-800 whitespace-pre-wrap">{content}</p>;
+    return <ReactMarkdown className="prose prose-sm">{content}</ReactMarkdown>;
   };
 
   useEffect(() => {
@@ -89,7 +93,7 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
       >
         {/* Chat Header */}
         <div
-          className="bg-blue-600 text-white p-4 flex justify-between items-center cursor-pointer hover:bg-blue-700 transition-colors"
+          className="bg-gradient-to-r from-blue-600 to-blue-500 text-white p-4 flex justify-between items-center cursor-pointer hover:from-blue-700 hover:to-blue-600 transition-colors"
           onClick={() => setIsOpen(!isOpen)}
         >
           <h3 className="text-lg font-semibold">AI Chat</h3>
@@ -150,7 +154,7 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
               />
               <button
                 onClick={handleSendMessage}
-                className="bg-blue-600 text-white px-4 rounded-lg hover:bg-blue-700"
+                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 rounded-xl shadow-md hover:from-blue-600 hover:to-blue-700"
                 disabled={isLoading}
               >
                 {isLoading ? "..." : "Send"}
