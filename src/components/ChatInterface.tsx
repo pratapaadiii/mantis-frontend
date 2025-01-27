@@ -1,6 +1,8 @@
-// mantis-frontend/src/components/ChatInterface.tsx
 "use client";
-import { useState } from "react";
+
+import { useState, useEffect, useRef } from "react";
+import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
+import { atomOneLight } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -11,7 +13,8 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(false); // State to control chat visibility
+  const [isOpen, setIsOpen] = useState(false);
+  const chatBodyRef = useRef<HTMLDivElement>(null);
 
   const handleSendMessage = async () => {
     if (!input.trim()) return;
@@ -44,6 +47,35 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
     }
   };
 
+  const handleCopyMessage = (content: string) => {
+    navigator.clipboard.writeText(content).then(() => {
+      alert("Message copied to clipboard!");
+    });
+  };
+
+  const handleClearChat = () => {
+    setMessages([]);
+  };
+
+  const renderContent = (content: string) => {
+    if (content.startsWith("```") && content.endsWith("```")) {
+      const language = content.split("\n")[0].replace(/```/g, "").trim();
+      const code = content.split("\n").slice(1, -1).join("\n");
+      return (
+        <SyntaxHighlighter language={language || "text"} style={atomOneLight}>
+          {code}
+        </SyntaxHighlighter>
+      );
+    }
+    return <p className="text-gray-800 whitespace-pre-wrap">{content}</p>;
+  };
+
+  useEffect(() => {
+    if (chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
+  }, [messages]);
+
   return (
     <div
       className={`fixed bottom-4 right-4 z-50 transition-all duration-300 ${
@@ -57,7 +89,7 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
       >
         {/* Chat Header */}
         <div
-          className="bg-blue-600 text-white p-4 flex justify-between items-center cursor-pointer"
+          className="bg-blue-600 text-white p-4 flex justify-between items-center cursor-pointer hover:bg-blue-700 transition-colors"
           onClick={() => setIsOpen(!isOpen)}
         >
           <h3 className="text-lg font-semibold">AI Chat</h3>
@@ -66,17 +98,40 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
 
         {/* Chat Body */}
         {isOpen && (
-          <div className="flex-1 p-4 overflow-y-auto">
+          <div ref={chatBodyRef} className="flex-1 p-4 overflow-y-auto">
             {messages.map((msg, index) => (
               <div
                 key={index}
-                className={`p-3 rounded-lg mb-2 ${
+                className={`p-3 rounded-lg mb-2 relative ${
                   msg.role === "user" ? "bg-blue-100" : "bg-green-100"
                 }`}
               >
-                <p className="text-gray-800">{msg.content}</p>
+                {renderContent(msg.content)}
+                {msg.role === "assistant" && (
+                  <div className="absolute bottom-2 right-2 flex space-x-2">
+                    <button
+                      onClick={() => handleCopyMessage(msg.content)}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      📋
+                    </button>
+                    <button
+                      onClick={handleClearChat}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
+            {isLoading && (
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-dot-animation"></div>
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-dot-animation delay-200"></div>
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-dot-animation delay-400"></div>
+              </div>
+            )}
           </div>
         )}
 
@@ -89,7 +144,7 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-                className="flex-grow p-2 border border-gray-300 rounded-lg"
+                className="flex-grow p-2 border border-gray-300 rounded-lg text-black focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 placeholder="Ask a question..."
                 disabled={isLoading}
               />
