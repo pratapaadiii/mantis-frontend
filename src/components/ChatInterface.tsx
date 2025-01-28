@@ -88,8 +88,7 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
   };
 
   const handleClearChat = () => {
-    setMessages([]);
-    setHasNewMessage(false);
+    if (confirm("Are you sure you want to clear the chat?")) setMessages([]);
   };
 
   const renderContent = (content: string) => {
