@@ -94,7 +94,7 @@ export async function POST(request: Request) {
       {
         "phases": [
           {
-            "name": "Phase Name",
+            "name": "App Features",
             "timeline": "Duration (e.g., "2 weeks")",
             "tasks": ["Day 1: Action", "Day 2: Action"],
             "milestones": ["Complete X", "Launch Y"]
@@ -102,12 +102,13 @@ export async function POST(request: Request) {
         ]
       }
       RULES:
-      1. Timeline format: <number>[optional -<number>] weeks
-      2. Milestones start with verbs
-      3. No markdown/comments
-      4. Escape special characters
-      5. Validate JSON syntax
-      6. Adjust complexity based on team size and preferences`
+      1. Be helpful.
+      2. Timeline format: <number>[optional -<number>] weeks
+      3. Milestones start with verbs
+      4. No markdown/comments
+      5. Escape special characters
+      6. Validate JSON syntax
+      7. Adjust complexity based on team size and preferences`
     };
 
     const userPrompt = `Generate MVP roadmap for ${appName}
@@ -126,10 +127,10 @@ export async function POST(request: Request) {
     const response = await axios.post(
       'https://api.deepseek.com/v1/chat/completions',
       {
-        model: 'deepseek-reasoner',
+        model: 'deepseek-chat',
         messages: [systemMessage, { role: 'user', content: userPrompt }],
         temperature: 0.3,
-        max_tokens: 4096,
+        max_tokens: 7096,
         top_p: 0.9
       },
       {
@@ -176,7 +177,7 @@ async function parseWithRetry(rawData: string): Promise<Roadmap> {
       const correctionResponse = await axios.post(
         'https://api.deepseek.com/v1/chat/completions',
         {
-          model: 'deepseek-reasoner',
+          model: 'deepseek-chat',
           messages: [
             { role: 'user', content: `${JSON_RETRY_PROMPT}\n${rawData}` }
           ],

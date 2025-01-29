@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:latest  # Fixed: image should be top-level
+    container_name: my-postgres  # Optional but helpful
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"  # Important format
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Removed invalid "host" property - use networks instead
+
+  # app:  # <-- Your Next.js service
+  #   build: .
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - POSTGRES_HOST=db  # Use service name for DB connection
+  #   volumes:
+  #     - .:/app            # Sync local code changes
+  #     - /app/node_modules # Keep container's node_modules intact
+  #   depends_on:
+  #     - db                # Start DB first
+
+volumes:
+  postgres_data:

@@ -19,6 +19,20 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const chatBodyRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea as content grows
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = "auto";
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`; // Max height of 150px
+    }
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [input]);
 
   const handleSendMessage = async (retryMessage?: ChatMessage) => {
     const messageContent = retryMessage ? retryMessage.content : input.trim();
@@ -31,7 +45,12 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
       failed: false,
     };
     setMessages((prev) => [...prev, userMessage]);
-    if (!retryMessage) setInput("");
+    if (!retryMessage) {
+      setInput("");
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
+    }
     setIsLoading(true);
 
     const timeoutId = setTimeout(() => {
@@ -74,6 +93,13 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
       alert(error.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
     }
   };
 
@@ -168,9 +194,7 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
               >
                 {renderContent(msg.content)}
                 <div className="absolute bottom-2 right-2 flex space-x-2">
-                  <span className="text-xs text-gray-500">
-                    {msg.timestamp}
-                  </span>
+                  <span className="text-xs text-gray-500">{msg.timestamp}</span>
                   {msg.role === "user" && msg.failed && (
                     <button
                       onClick={() => handleRetryMessage(msg)}
@@ -212,18 +236,19 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
         {isOpen && (
           <div className="p-4 border-t border-gray-200">
             <div className="flex space-x-2">
-              <input
-                type="text"
+              <textarea
+                ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-                className="flex-grow p-2 border border-gray-300 rounded-lg text-black focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                onKeyPress={handleKeyPress}
+                className="flex-grow p-2 border border-gray-300 rounded-lg text-black focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 resize-none min-h-[40px] max-h-[150px] overflow-y-auto"
                 placeholder="Ask a question..."
                 disabled={isLoading}
+                rows={1}
               />
               <button
-                onClick={handleSendMessage}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 rounded-xl shadow-md hover:from-blue-600 hover:to-blue-700"
+                onClick={() => handleSendMessage()}
+                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 rounded-xl shadow-md hover:from-blue-600 hover:to-blue-700 h-[40px]"
                 disabled={isLoading}
               >
                 {isLoading ? "..." : "Send"}

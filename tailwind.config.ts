@@ -2,8 +2,8 @@ import type { Config } from "tailwindcss";
 
 export default {
   content: [
-    "./src/**/*.{js,ts,jsx,tsx,mdx}", // Include all source files
-    "./public/**/*.html",             // Include static HTML files
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
+    "./public/**/*.html",
   ],
   theme: {
     extend: {
@@ -29,24 +29,29 @@ export default {
           dark: "#047857",
         },
         blue: {
+          50: "#EFF6FF",
           100: "#DBEAFE",
           500: "#3B82F6",
           600: "#2563EB",
           700: "#1D4ED8",
         },
-        green: {
-          100: "#D1FAE5",
-        },
         gray: {
+          50: "#F9FAFB",
           100: "#F3F4F6",
           200: "#E5E7EB",
           300: "#D1D5DB",
           500: "#6B7280",
           700: "#374151",
           800: "#1F2937",
+          900: "#111827",
+        },
+        green: {
+          100: "#D1FAE5",
+          500: "#10B981",
         },
       },
       spacing: {
+        sidebar: "16rem",
         18: "4.5rem",
         72: "18rem",
         84: "21rem",
@@ -54,10 +59,21 @@ export default {
       },
       borderRadius: {
         "4xl": "2rem",
-        code: "0.5rem", // New addition
+        "code": "0.5rem",
+        "xl": "1rem",
+        "lg": "0.5rem",
       },
       boxShadow: {
-        code: "0 0 0 1px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.1)", // New addition
+        "code": "0 0 0 1px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.1)",
+        "sidebar": "2px 0 8px rgba(0, 0, 0, 0.05)",
+      },
+      minHeight: {
+        "input-min": "40px",
+        "screen-70": "70vh",
+      },
+      maxHeight: {
+        "input-max": "120px",
+        "screen-80": "80vh",
       },
       keyframes: {
         blink: {
@@ -68,37 +84,60 @@ export default {
       animation: {
         "dot-animation": "blink 1.4s infinite",
       },
+      transitionProperty: {
+        width: "width",
+        height: "height",
+      },
     },
   },
   safelist: [
     {
-      pattern: /^bg-(blue|green|gray)-(100|500|600|700)$/,
+      pattern: /^bg-(blue|green|gray)-(50|100|500|600|700)$/,
       variants: ["hover", "focus"],
     },
     {
-      pattern: /^text-(gray|blue|green)-(500|700|800)$/,
+      pattern: /^text-(gray|blue|green)-(500|600|700|800|900)$/,
       variants: ["hover"],
     },
     {
       pattern: /^border-(gray)-(200|300)$/,
     },
+    {
+      pattern: /^stroke-(current)/,
+    },
+    {
+      pattern: /^w-(64|0)/,
+    },
+    {
+      pattern: /^min-h-(40|screen-70)/,
+    },
+    {
+      pattern: /^max-h-(120|screen-80)/,
+    },
     "fixed",
+    "absolute",
+    "relative",
     "bottom-4",
     "right-4",
+    "top-2",
+    "right-2",
     "z-50",
     "transition-all",
+    "transition-width",
     "duration-300",
-    "w-96",
-    "h-[500px]",
-    "w-20",
+    "w-64",
+    "w-0",
+    "h-[700px]",
     "h-20",
-    "bg-white",
+    "bg-gray-50",
     "rounded-lg",
     "shadow-lg",
+    "shadow-sidebar",
     "flex",
     "flex-col",
     "overflow-hidden",
     "border",
+    "border-r",
     "border-gray-200",
     "bg-blue-600",
     "text-white",
@@ -112,17 +151,15 @@ export default {
     "overflow-y-auto",
     "p-3",
     "pb-8",
-    "rounded-lg",
     "mb-2",
     "bg-blue-100",
     "bg-green-100",
-    "text-gray-800",
     "border-t",
     "space-x-2",
     "flex-grow",
     "p-2",
     "border-gray-300",
-    "hover:bg-blue-700",
+    "hover:bg-gray-700",
     "whitespace-pre-wrap",
     "focus:outline-none",
     "focus:border-blue-500",
@@ -140,9 +177,13 @@ export default {
     "shadow-md",
     "prose",
     "prose-sm",
-    "p-4", // New addition
-    "rounded-code", // New addition
-    "shadow-code", // New addition
+    "rounded-code",
+    "shadow-code",
+    "resize-y",
+    "animate-dot-animation",
+    "stroke-current",
+    "overflow-y-auto",
+    "hover:bg-gray-200",
   ],
   plugins: [
     require("@tailwindcss/forms"),

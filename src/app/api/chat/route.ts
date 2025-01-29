@@ -79,7 +79,7 @@ export async function POST(request: Request) {
           'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        timeout: 37000,
+        timeout: 79000,
       }
     );
 
