@@ -1,19 +1,25 @@
 "use client";
-
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import { atomOneDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 
+// Types
 type ChatMessage = {
+  id: string; // Unique identifier for each message
   role: "user" | "assistant";
   content: string;
   timestamp: string;
   failed?: boolean;
 };
 
-export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+type ChatInterfaceProps = {
+  roadmap: Roadmap; // The active roadmap
+  messages: ChatMessage[]; // Chat history for the active roadmap
+  onSendMessage: (message: ChatMessage) => void; // Function to send a new message
+};
+
+export default function ChatInterface({ roadmap, messages, onSendMessage }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -26,7 +32,7 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = "auto";
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`; // Max height of 150px
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`;
     }
   };
 
@@ -34,8 +40,24 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
     adjustTextareaHeight();
   }, [input]);
 
-  const handleSendMessage = async (retryMessage?: ChatMessage) => {
-    const messageContent = retryMessage ? retryMessage.content : input.trim();
+  // Scroll to the bottom when new messages are added
+  useEffect(() => {
+    if (chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  // Notify users of new messages when the chat is minimized
+  useEffect(() => {
+    if (!isOpen && hasNewMessage) {
+      alert("You have a new message!");
+      setHasNewMessage(false);
+    }
+  }, [hasNewMessage, isOpen]);
+
+  // Handle sending a message
+  const handleSendMessage = async () => {
+    const messageContent = input.trim();
     if (!messageContent) return;
 
     const userMessage: ChatMessage = {
@@ -44,24 +66,16 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
       timestamp: new Date().toLocaleTimeString(),
       failed: false,
     };
-    setMessages((prev) => [...prev, userMessage]);
-    if (!retryMessage) {
-      setInput("");
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-      }
-    }
-    setIsLoading(true);
 
+    // Add the user's message to the chat history
+    onSendMessage(userMessage);
+    setInput("");
+
+    setIsLoading(true);
     const timeoutId = setTimeout(() => {
       setIsLoading(false);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg === userMessage ? { ...msg, failed: true } : msg
-        )
-      );
       alert("Request timed out. Please try again.");
-    }, 50000);
+    }, 50000); // 50-second timeout
 
     try {
       const response = await fetch("/api/chat", {
@@ -84,18 +98,16 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
         content: data.message,
         timestamp: new Date().toLocaleTimeString(),
       };
-      setMessages((prev) => [...prev, assistantMessage]);
+      onSendMessage(assistantMessage); // Add the assistant's response to the chat history
       setHasNewMessage(true);
     } catch (error) {
-      setMessages((prev) =>
-        prev.map((msg) => (msg === userMessage ? { ...msg, failed: true } : msg))
-      );
-      alert(error.message);
+      alert(error.message || "An error occurred");
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Handle pressing Enter key to send a message
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -103,20 +115,7 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
     }
   };
 
-  const handleRetryMessage = (message: ChatMessage) => {
-    handleSendMessage(message);
-  };
-
-  const handleCopyMessage = (content: string) => {
-    navigator.clipboard.writeText(content).then(() => {
-      alert("Message copied to clipboard!");
-    });
-  };
-
-  const handleClearChat = () => {
-    if (confirm("Are you sure you want to clear the chat?")) setMessages([]);
-  };
-
+  // Render syntax-highlighted code blocks or markdown content
   const renderContent = (content: string) => {
     if (content.startsWith("```") && content.endsWith("```")) {
       const language = content.split("\n")[0].replace(/```/g, "").trim();
@@ -126,13 +125,13 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
           <SyntaxHighlighter
             language={language}
             style={atomOneDark}
-            className="p-4 rounded-code shadow-code"
+            className="p-4 rounded-lg shadow-md"
           >
             {code}
           </SyntaxHighlighter>
           <button
             className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-            onClick={() => handleCopyMessage(code)}
+            onClick={() => navigator.clipboard.writeText(code).then(() => alert("Code copied to clipboard!"))}
           >
             📋
           </button>
@@ -141,19 +140,6 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
     }
     return <ReactMarkdown className="prose prose-sm">{content}</ReactMarkdown>;
   };
-
-  useEffect(() => {
-    if (chatBodyRef.current) {
-      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    if (!isOpen && hasNewMessage) {
-      alert("You have a new message!");
-      setHasNewMessage(false);
-    }
-  }, [hasNewMessage, isOpen]);
 
   return (
     <div
@@ -171,7 +157,7 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
           className="bg-gradient-to-r from-blue-600 to-blue-500 text-white p-4 flex justify-between items-center cursor-pointer hover:from-blue-700 hover:to-blue-600 transition-colors"
           onClick={() => setIsOpen(!isOpen)}
         >
-          <h3 className="text-lg font-semibold">AI Chat</h3>
+          <h3 className="text-lg font-semibold">AI Chat - {roadmap.appName}</h3>
           <div className="flex items-center">
             {hasNewMessage && !isOpen && (
               <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full mr-2">
@@ -197,7 +183,7 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
                   <span className="text-xs text-gray-500">{msg.timestamp}</span>
                   {msg.role === "user" && msg.failed && (
                     <button
-                      onClick={() => handleRetryMessage(msg)}
+                      onClick={() => handleSendMessage()}
                       className="text-gray-500 hover:text-gray-700"
                     >
                       🔄
@@ -206,13 +192,17 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
                   {msg.role === "assistant" && (
                     <>
                       <button
-                        onClick={() => handleCopyMessage(msg.content)}
+                        onClick={() => navigator.clipboard.writeText(msg.content).then(() => alert("Message copied to clipboard!"))}
                         className="text-gray-500 hover:text-gray-700"
                       >
                         📋
                       </button>
                       <button
-                        onClick={handleClearChat}
+                        onClick={() => {
+                          if (confirm("Are you sure you want to clear the chat?")) {
+                            onSendMessage([]); // Clear chat history
+                          }
+                        }}
                         className="text-gray-500 hover:text-gray-700"
                       >
                         🗑️
@@ -223,10 +213,10 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
               </div>
             ))}
             {isLoading && (
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-dot-animation"></div>
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-dot-animation delay-200"></div>
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-dot-animation delay-400"></div>
+              <div className="flex space-x-1 justify-center mt-4">
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-150"></div>
+                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-300"></div>
               </div>
             )}
           </div>
@@ -247,7 +237,7 @@ export default function ChatInterface({ roadmap }: { roadmap: Roadmap }) {
                 rows={1}
               />
               <button
-                onClick={() => handleSendMessage()}
+                onClick={handleSendMessage}
                 className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 rounded-xl shadow-md hover:from-blue-600 hover:to-blue-700 h-[40px]"
                 disabled={isLoading}
               >
