@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import { atomOneDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
+import JumpToLatestButton from "../components/JumpToLatestButton";
 
 // Types
 type ChatMessage = {
@@ -23,7 +24,6 @@ export default function ChatInterface({ roadmap, messages, onSendMessage }: Chat
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [hasNewMessage, setHasNewMessage] = useState(false);
   const chatBodyRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -41,39 +41,42 @@ export default function ChatInterface({ roadmap, messages, onSendMessage }: Chat
   }, [input]);
 
   // Scroll to the bottom when new messages are added
-  useEffect(() => {
+  const scrollToBottom = () => {
     if (chatBodyRef.current) {
       chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
     }
+  };
+
+  useEffect(() => {
+    scrollToBottom();
   }, [messages]);
 
-  // Notify users of new messages when the chat is minimized
-  useEffect(() => {
-    if (!isOpen && hasNewMessage) {
-      alert("You have a new message!");
-      setHasNewMessage(false);
-    }
-  }, [hasNewMessage, isOpen]);
-
   // Handle sending a message
-  const handleSendMessage = async () => {
-    const messageContent = input.trim();
+  const handleSendMessage = async (retryMessageId?: string) => {
+    const messageContent = retryMessageId
+      ? messages.find((msg) => msg.id === retryMessageId)?.content.trim()
+      : input.trim();
+
     if (!messageContent) return;
 
     const userMessage: ChatMessage = {
+      id: Date.now().toString(),
       role: "user",
       content: messageContent,
       timestamp: new Date().toLocaleTimeString(),
       failed: false,
     };
 
-    // Add the user's message to the chat history
-    onSendMessage(userMessage);
-    setInput("");
+    // Add the user's message to the chat history if it's not a retry
+    if (!retryMessageId) {
+      onSendMessage(userMessage);
+      setInput("");
+    }
 
     setIsLoading(true);
     const timeoutId = setTimeout(() => {
       setIsLoading(false);
+      onSendMessage({ ...userMessage, failed: true }); // Mark message as failed
       alert("Request timed out. Please try again.");
     }, 50000); // 50-second timeout
 
@@ -94,25 +97,31 @@ export default function ChatInterface({ roadmap, messages, onSendMessage }: Chat
       clearTimeout(timeoutId);
       const data = await response.json();
       const assistantMessage: ChatMessage = {
+        id: Date.now().toString(),
         role: "assistant",
         content: data.message,
         timestamp: new Date().toLocaleTimeString(),
       };
       onSendMessage(assistantMessage); // Add the assistant's response to the chat history
-      setHasNewMessage(true);
     } catch (error) {
+      onSendMessage({ ...userMessage, failed: true }); // Mark message as failed
       alert(error.message || "An error occurred");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle pressing Enter key to send a message
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
+    // Handle pressing Enter key to send a message
+    const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
+      }
+    };
+
+  // Handle retrying a failed message
+  const handleRetryMessage = (messageId: string) => {
+    handleSendMessage(messageId);
   };
 
   // Render syntax-highlighted code blocks or markdown content
@@ -158,19 +167,12 @@ export default function ChatInterface({ roadmap, messages, onSendMessage }: Chat
           onClick={() => setIsOpen(!isOpen)}
         >
           <h3 className="text-lg font-semibold">AI Chat - {roadmap.appName}</h3>
-          <div className="flex items-center">
-            {hasNewMessage && !isOpen && (
-              <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full mr-2">
-                New
-              </span>
-            )}
-            <span>{isOpen ? "✕" : "💬"}</span>
-          </div>
+          <span>{isOpen ? "✕" : "💬"}</span>
         </div>
 
         {/* Chat Body */}
         {isOpen && (
-          <div ref={chatBodyRef} className="flex-1 p-4 overflow-y-auto">
+          <div ref={chatBodyRef} className="flex-1 p-4 overflow-y-auto relative">
             {messages.map((msg, index) => (
               <div
                 key={index}
@@ -183,7 +185,7 @@ export default function ChatInterface({ roadmap, messages, onSendMessage }: Chat
                   <span className="text-xs text-gray-500">{msg.timestamp}</span>
                   {msg.role === "user" && msg.failed && (
                     <button
-                      onClick={() => handleSendMessage()}
+                      onClick={() => handleRetryMessage(msg.id)}
                       className="text-gray-500 hover:text-gray-700"
                     >
                       🔄
@@ -219,6 +221,8 @@ export default function ChatInterface({ roadmap, messages, onSendMessage }: Chat
                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-300"></div>
               </div>
             )}
+            {/* Jump to Latest Button */}
+            <JumpToLatestButton chatBodyRef={chatBodyRef} />
           </div>
         )}
 
@@ -237,7 +241,7 @@ export default function ChatInterface({ roadmap, messages, onSendMessage }: Chat
                 rows={1}
               />
               <button
-                onClick={handleSendMessage}
+                onClick={() => handleSendMessage()}
                 className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 rounded-xl shadow-md hover:from-blue-600 hover:to-blue-700 h-[40px]"
                 disabled={isLoading}
               >

@@ -54,9 +54,6 @@ export default {
           200: "#A7F3D0",
           500: "#10B981",
         },
-        // Chat-specific colors
-        userMessage: "#E0F2FE", // Light blue for user messages
-        assistantMessage: "#F0FFF4", // Light green for assistant messages
       },
 
       // Spacing
@@ -79,6 +76,7 @@ export default {
         xl: "1rem",
         lg: "0.5rem",
         message: "0.75rem", // Rounded corners for messages
+        full: "9999px", // For circular buttons
       },
 
       // Shadows
@@ -149,6 +147,17 @@ export default {
         xl: "1280px",
         "2xl": "1536px",
       },
+
+      // Position Utilities
+      position: {
+        fixed: "fixed",
+      },
+
+      // Z-Index
+      zIndex: {
+        50: "50",
+        999: "999",
+      },
     },
   },
 
@@ -165,29 +174,24 @@ export default {
         /^text-(gray|blue|green|red)-(500|600|700|800|900)$/,
       variants: ["hover"],
     },
-
     // Layout Classes
     {
       pattern:
         /^(w|h|min-h|max-h)-(sidebar|chat-header|screen-70|screen-80)/,
     },
-
     // Animation Classes
     "animate-spin",
     "animate-slide-in",
     "animate-bounce",
-
     // Interactive States
     {
       pattern: /^cursor-(pointer|se-resize|not-allowed)/,
     },
-
     // Position Utilities
     {
       pattern:
         /^(top|bottom|left|right)-([0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|50|100)/,
     },
-
     // Special Cases
     "prose",
     "prose-sm",
