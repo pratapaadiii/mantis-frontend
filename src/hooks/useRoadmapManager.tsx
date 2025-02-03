@@ -31,7 +31,6 @@ export function useRoadmapManager() {
   useEffect(() => {
     const savedRoadmaps = localStorage.getItem("roadmaps");
     const savedChatHistories = localStorage.getItem("chatHistories");
-
     if (savedRoadmaps) setRoadmaps(JSON.parse(savedRoadmaps));
     if (savedChatHistories) setChatHistories(JSON.parse(savedChatHistories));
   }, []);
@@ -67,6 +66,7 @@ export function useRoadmapManager() {
     roadmaps,
     activeRoadmapId,
     chatHistories,
+    setChatHistories, // Ensure this is returned
     addRoadmap,
     deleteRoadmap,
     clearAll,

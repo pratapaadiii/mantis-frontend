@@ -1,58 +1,28 @@
 "use client";
-import React, { useState, useEffect } from "react"; // Add useEffect here
-import Sidebar from "../components/Sidebar";
-import ChatInterface from "../components/ChatInterface";
+import React, { useState } from "react"; // Removed useEffect since it's unused
+import Sidebar from "../components/Sidebar/Sidebar";
+import ChatInterface from "../components/ChatInterface/ChatInterface";
 import Footer from "../components/Footer";
 import {
   RoadmapForm,
   RoadmapDisplay,
   LoadingOverlay,
 } from "../components/RoadmapComponents";
-
-// Types
-type Phase = {
-  name: string;
-  timeline: string;
-  tasks: string[];
-  milestones: string[];
-};
-
-type Roadmap = {
-  id: string;
-  appName: string;
-  purpose: string;
-  features: string[];
-  phases: Phase[];
-  timestamp: string;
-};
-
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-  timestamp: string;
-};
+import { useRoadmapManager } from "../hooks/useRoadmapManager";
 
 export default function Home() {
-  // State Management
-  const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
-  const [activeRoadmapId, setActiveRoadmapId] = useState<string | null>(null);
-  const [chatHistories, setChatHistories] = useState<Record<string, ChatMessage[]>>({});
+  const {
+    roadmaps,
+    activeRoadmapId,
+    chatHistories,
+    setChatHistories, // Ensure this is destructured
+    addRoadmap,
+    deleteRoadmap,
+    clearAll,
+    setActiveRoadmapId,
+  } = useRoadmapManager();
+
   const [isLoading, setIsLoading] = useState(false);
-
-  // Load roadmaps and chat histories from localStorage on component mount
-  useEffect(() => {
-    const savedRoadmaps = localStorage.getItem("roadmaps");
-    const savedChatHistories = localStorage.getItem("chatHistories");
-
-    if (savedRoadmaps) setRoadmaps(JSON.parse(savedRoadmaps));
-    if (savedChatHistories) setChatHistories(JSON.parse(savedChatHistories));
-  }, []);
-
-  // Save roadmaps and chat histories to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem("roadmaps", JSON.stringify(roadmaps));
-    localStorage.setItem("chatHistories", JSON.stringify(chatHistories));
-  }, [roadmaps, chatHistories]);
 
   // Handle generating a new roadmap
   const handleRoadmapSubmission = async (formData: {
@@ -61,7 +31,6 @@ export default function Home() {
     features: string[];
   }) => {
     setIsLoading(true);
-
     try {
       const response = await fetch("/api/roadmap", {
         method: "POST",
@@ -75,7 +44,7 @@ export default function Home() {
       }
 
       const data = await response.json();
-      const newRoadmap: Roadmap = {
+      const newRoadmap = {
         id: Date.now().toString(),
         appName: formData.appName,
         purpose: formData.purpose,
@@ -84,37 +53,11 @@ export default function Home() {
         timestamp: new Date().toLocaleString(),
       };
 
-      setRoadmaps((prev) => [...prev, newRoadmap]);
-      setActiveRoadmapId(newRoadmap.id);
-      setChatHistories((prev) => ({ ...prev, [newRoadmap.id]: [] }));
+      addRoadmap(newRoadmap); // Add the new roadmap to the state
     } catch (error) {
       alert(error.message || "An error occurred");
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  // Handle selecting a roadmap
-  const handleRoadmapSelect = (id: string) => {
-    setActiveRoadmapId(id);
-  };
-
-  // Handle deleting a roadmap
-  const handleDeleteRoadmap = (id: string) => {
-    setRoadmaps((prev) => prev.filter((r) => r.id !== id));
-    setChatHistories((prev) => {
-      const { [id]: _, ...rest } = prev;
-      return rest;
-    });
-    if (activeRoadmapId === id) setActiveRoadmapId(null);
-  };
-
-  // Handle clearing all roadmaps
-  const handleClearAll = () => {
-    if (confirm("Are you sure you want to clear all roadmaps?")) {
-      setRoadmaps([]);
-      setChatHistories({});
-      setActiveRoadmapId(null);
     }
   };
 
@@ -132,9 +75,9 @@ export default function Home() {
           timestamp: r.timestamp,
         }))}
         activeRoadmapId={activeRoadmapId}
-        onRoadmapSelect={handleRoadmapSelect}
-        onDeleteRoadmap={handleDeleteRoadmap}
-        onClearAll={handleClearAll}
+        onRoadmapSelect={setActiveRoadmapId}
+        onDeleteRoadmap={deleteRoadmap}
+        onClearAll={clearAll}
         onCreateNew={() => setActiveRoadmapId(null)}
       />
 
@@ -151,7 +94,7 @@ export default function Home() {
               <ChatInterface
                 roadmap={activeRoadmap}
                 messages={activeChatHistory}
-                onSendMessage={(message: ChatMessage) => {
+                onSendMessage={(message) => {
                   setChatHistories((prev) => ({
                     ...prev,
                     [activeRoadmapId!]: [...(prev[activeRoadmapId!] || []), message],
@@ -166,6 +109,7 @@ export default function Home() {
       {/* Loading Overlay */}
       {isLoading && <LoadingOverlay />}
 
+      {/* Footer */}
       <Footer />
     </div>
   );

@@ -4,7 +4,7 @@ export default function Header() {
       <div className="container mx-auto p-6 flex justify-between items-center">
         <div>
           <h1 className="text-white text-3xl font-extrabold tracking-tight">MANTIS</h1>
-          <p className="text-blue-200 text-lg">Build your MVP roadmap with confidence</p>
+          <p className="text-blue-200 text-lg">MANTIS - Build your MVP roadmap with confidence</p>
         </div>
         <nav>
           <ul className="flex space-x-6">
